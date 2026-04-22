@@ -1,1 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Tracer Pro - Algorithmic Analysis</title>
+    <style>
+        :root {
+            --bg-color: #05070a;
+            --panel-bg: rgba(16, 20, 28, 0.95);
+            --accent: #00d4ff; /* Azul Eléctrico */
+            --accent-glow: rgba(0, 212, 255, 0.3);
+            --success: #00ffcc; /* Cyan Glaciar */
+            --text-primary: #f0f2f5;
+            --text-secondary: #64748b;
+            --bar-default: #1e293b;
+            --bar-comparing: #00d4ff;
+            --bar-found: #00ffcc;
+            --bar-inactive: #0f172a;
+            --bar-range: #162e45;
+            --border-ui: #1e293b;
+        }
 
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Panel Lateral --- */
+        #sidebar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            padding: 30px 24px;
+            border-right: 1px solid var(--border-ui);
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 { font-size: 1rem; color: var(--accent); margin: 0; text-transform: uppercase; letter-spacing: 3px; font-weight: 700; border-left: 3px solid var(--accent); padding-left: 15px; }
+
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        label { color: var(--text-secondary); font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; }
+        
+        input, select {
+            background-color: #0a0e14;
+            border: 1px solid var(--border-ui);
+            color: var(--text-primary);
+            padding: 12px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        input:focus, select:focus { border-color: var(--accent); }
+
+        button {
+            background-color: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        button:hover:not(:disabled) { background-color: var(--accent); color: #000; box-shadow: 0 0 20px var(--accent-glow); }
+        button:disabled { border-color: #1e293b; color: #334155; cursor: not-allowed; }
+
+        #reset-btn { border-color: #334155; color: #64748b; margin-top: auto; }
+
+        /* --- Panel Principal --- */
+        #main-content {
+            flex-grow: 1;
+            display: grid;
+            grid-template-rows: 100px 1fr 200px;
+            padding: 30px;
+            gap: 20px;
+            background-image: radial-gradient(circle at 50% 50%, #0a111a 0%, #05070a 100%);
+        }
+
+        /* --- Métricas Superiores --- */
+        #stats-bar {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-ui);
+            padding: 15px 25px;
+            border-radius: 8px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .stat-card label { font-size: 0.6rem; color: var(--text-secondary); margin-bottom: 5px; }
+        .stat-card span { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+
+        /* --- Visualización --- */
+        #visualization-container {
+            background-color: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-ui);
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-end;
+            padding: 30px;
+            gap: 5px;
+            position: relative;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+        }
+
+        .bar {
+            background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, var(--bar-default) 100%);
+            flex-grow: 1;
+            border-radius: 3px 3px 0 0;
+            transition: height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s;
+        }
+
+        /* --- Consola --- */
+        #terminal-log {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-ui);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.75rem;
+            overflow-y: auto;
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+
+        .log-entry { margin-bottom: 8px; border-left: 2px solid #1e293b; padding-left: 12px; }
+        .log-entry.system { color: var(--accent); border-left-color: var(--accent); }
+        .log-entry.success { color: var(--success); border-left-color: var(--success); }
+
+    </style>
+</head>
+<body>
+
+    <aside id="sidebar">
+        <h1>Data Tracer Pro</h1>
+
+        <div class="control-group">
+            <label>Seleccionar Algoritmo</label>
+            <select id="algo-select">
+                <option value="lineal">Búsqueda Secuencial</option>
+                <option value="binaria">Búsqueda Binaria</option>
+                <option value="exponencial">Búsqueda Exponencial</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Valor Objetivo</label>
+            <input type="number" id="search-target" value="42">
+        </div>
+
+        <div class="control-group">
+            <label>Densidad de Datos: <span id="size-val">40</span></label>
+            <input type="range" id="array-size" min="10" max="100" value="40">
+        </div>
+
+        <div class="control-group">
+            <label>Latencia de Procesamiento: <span id="speed-val">100</span>ms</label>
+            <input type="range" id="speed" min="10" max="1000" step="10" value="100">
+        </div>
+
+        <button id="gen-array">Generar DataSet</button>
+        <button id="sort-array">Indexar Memoria</button>
+        <button id="run-btn">Ejecutar Análisis</button>
+        
+        <button id="reset-btn">Abortar Proceso</button>
+    </aside>
+
+    <main id="main-content">
+        <div id="stats-bar">
+            <div class="stat-card">
+                <label>Iteraciones de Sistema</label>
+                <span id="comparisons-count">0</span>
+            </div>
+            <div class="stat-card">
+                <label>Puntero de Ubicación</label>
+                <span id="index-found">--</span>
+            </div>
+            <div class="stat-card">
+                <label>Status Operativo</label>
+                <span id="status-text">LISTO</span>
+            </div>
+        </div>
+
+        <div id="visualization-container"></div>
+
+        <div id="terminal-log">
+            <div class="log-entry system">Kernel v2.4 initialized. Esperando directivas de análisis...</div>
+        </div>
+    </main>
+
+    <script>
+        let originalArray = [];
+        let isSorted = false;
+        let isRunning = false;
+        let searchTimeout;
+
+        const container = document.getElementById('visualization-container');
+        const log = document.getElementById('terminal-log');
+        const sizeInput = document.getElementById('array-size');
+        const speedInput = document.getElementById('speed');
+        const runBtn = document.getElementById('run-btn');
+
+        function addLog(msg, type = '') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        const sleep = (ms) => new Promise(resolve => searchTimeout = setTimeout(resolve, ms));
+
+        function generateRandomArray(size) {
+            originalArray = Array.from({length: size}, () => Math.floor(Math.random() * 85) + 10);
+            isSorted = false;
+            document.getElementById('status-text').innerText = "STANDBY";
+            renderArray();
+            addLog(`DataSet regenerado: ${size} registros cargados.`);
+        }
+
+        function renderArray(highlightIdx = -1, range = null) {
+            container.innerHTML = '';
+            originalArray.forEach((val, i) => {
+                const bar = document.createElement('div');
+                bar.classList.add('bar');
+                bar.style.height = `${val}%`;
+                
+                if (highlightIdx === i) {
+                    bar.style.background = 'var(--bar-comparing)';
+                    bar.style.boxShadow = '0 0 15px var(--accent-glow)';
+                }
+                else if (range && (i < range.low || i > range.high)) {
+                    bar.style.background = 'var(--bar-inactive)';
+                    bar.style.opacity = '0.3';
+                }
+                else if (range && (i >= range.low && i <= range.high)) {
+                    bar.style.background = 'var(--bar-range)';
+                }
+                
+                container.appendChild(bar);
+            });
+        }
+
+        async function runSearch() {
+            if (isRunning) return;
+            const algo = document.getElementById('algo-select').value;
+            const target = parseInt(document.getElementById('search-target').value);
+            const speed = parseInt(speedInput.value);
+
+            if ((algo === 'binaria' || algo === 'exponencial') && !isSorted) {
+                addLog("ERROR: Se requiere indexación de memoria para este protocolo.", "system");
+                return;
+            }
+
+            isRunning = true;
+            runBtn.disabled = true;
+            document.getElementById('status-text').innerText = "ANALIZANDO";
+            document.getElementById('comparisons-count').innerText = "0";
+            let comparisons = 0;
+            let found = -1;
+
+            if (algo === 'lineal') {
+                for (let i = 0; i < originalArray.length; i++) {
+                    comparisons++;
+                    document.getElementById('comparisons-count').innerText = comparisons;
+                    renderArray(i);
+                    addLog(`Auditando dirección de memoria 0x${i.toString(16).toUpperCase()}`);
+                    await sleep(speed);
+                    if (originalArray[i] === target) { found = i; break; }
+                }
+            } 
+            else if (algo === 'binaria') {
+                found = await binarySearch(0, originalArray.length - 1, target, speed);
+            }
+            else if (algo === 'exponencial') {
+                addLog("Iniciando salto exponencial de punteros...", "system");
+                if (originalArray[0] === target) {
+                    found = 0;
+                } else {
+                    let i = 1;
+                    comparisons++;
+                    while (i < originalArray.length && originalArray[i] <= target) {
+                        renderArray(i);
+                        addLog(`Analizando bloque exponencial: i=${i}`);
+                        await sleep(speed);
+                        if (originalArray[i] === target) { found = i; break; }
+                        i = i * 2;
+                        comparisons++;
+                        document.getElementById('comparisons-count').innerText = comparisons;
+                    }
+                    if (found === -1) {
+                        let low = i / 2;
+                        let high = Math.min(i, originalArray.length - 1);
+                        addLog(`Rango delimitado: [${low}-${high}]. Iniciando búsqueda binaria interna.`);
+                        found = await binarySearch(low, high, target, speed, comparisons);
+                    }
+                }
+            }
+
+            if (found !== -1) {
+                renderArray();
+                container.children[found].style.background = 'var(--bar-found)';
+                container.children[found].style.boxShadow = '0 0 20px rgba(0,255,204,0.4)';
+                document.getElementById('index-found').innerText = `IDX_${found}`;
+                addLog(`OBJETIVO LOCALIZADO: Coincidencia en dirección 0x${found.toString(16).toUpperCase()}`, "success");
+            } else {
+                addLog("ANÁLISIS FINALIZADO: No se encontraron coincidencias en el DataSet.", "system");
+                document.getElementById('index-found').innerText = "NULL";
+            }
+
+            isRunning = false;
+            runBtn.disabled = false;
+            document.getElementById('status-text').innerText = "COMPLETO";
+        }
+
+        async function binarySearch(low, high, target, speed, initialComps = 0) {
+            let comps = initialComps;
+            while (low <= high) {
+                let mid = Math.floor((low + high) / 2);
+                comps++;
+                document.getElementById('comparisons-count').innerText = comps;
+                renderArray(mid, {low, high});
+                addLog(`Partición Binaria: Evaluando pivote ${mid}`);
+                await sleep(speed);
+
+                if (originalArray[mid] === target) return mid;
+                if (originalArray[mid] < target) low = mid + 1;
+                else high = mid - 1;
+            }
+            return -1;
+        }
+
+        // --- Listeners ---
+        sizeInput.addEventListener('input', (e) => {
+            document.getElementById('size-val').innerText = e.target.value;
+            generateRandomArray(parseInt(e.target.value));
+        });
+
+        speedInput.addEventListener('input', (e) => {
+            document.getElementById('speed-val').innerText = e.target.value;
+        });
+
+        document.getElementById('gen-array').addEventListener('click', () => generateRandomArray(parseInt(sizeInput.value)));
+        
+        document.getElementById('sort-array').addEventListener('click', () => {
+            originalArray.sort((a, b) => a - b);
+            isSorted = true;
+            document.getElementById('status-text').innerText = "INDEXADO";
+            renderArray();
+            addLog("Índice de memoria optimizado y ordenado.");
+        });
+
+        runBtn.addEventListener('click', runSearch);
+        
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            clearTimeout(searchTimeout);
+            isRunning = false;
+            runBtn.disabled = false;
+            generateRandomArray(parseInt(sizeInput.value));
+            addLog("PROCESO ABORTADO POR EL USUARIO.", "system");
+        });
+
+        generateRandomArray(40);
+    </script>
+</body>
+</html>
