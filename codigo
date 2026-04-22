@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Tracer - Terminal de Algoritmos v2.0</title>
+    <style>
+        :root {
+            --bg-color: #0d0d12;
+            --panel-bg: #16161a;
+            --accent: #bc13fe; /* Púrpura Neón */
+            --accent-glow: rgba(188, 19, 254, 0.3);
+            --text-primary: #e0e0e0;
+            --text-secondary: #707070;
+            --terminal-text: #a1a1aa; /* Plomo/Gris Metálico */
+            --bar-default: #33333b;
+            --bar-comparing: #bc13fe; /* Púrpura para comparar */
+            --bar-found: #ff00ff; /* Magenta para éxito */
+            --bar-inactive: #1a1a1f;
+            --bar-range: #2a2a35;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Panel de Control Lateral --- */
+        #sidebar {
+            width: 300px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-right: 2px solid #222;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+        }
+
+        h1 { font-size: 1.2rem; color: var(--accent); border-bottom: 1px solid var(--accent); padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px var(--accent-glow); }
+
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        label { color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; }
+        
+        input, select {
+            background-color: #000;
+            border: 1px solid #333;
+            color: var(--accent);
+            padding: 8px;
+            font-family: inherit;
+        }
+
+        input[type="range"] { -webkit-appearance: none; background: #222; height: 5px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; background: var(--accent); cursor: pointer; }
+
+        button {
+            background-color: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 10px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover:not(:disabled) { background-color: var(--accent); color: #000; box-shadow: 0 0 10px var(--accent-glow); }
+        button:disabled { border-color: #333; color: #333; cursor: not-allowed; }
+
+        /* --- Panel Principal --- */
+        #main-content {
+            flex-grow: 1;
+            display: grid;
+            grid-template-rows: auto 1fr 180px;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* --- Métricas --- */
+        #stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: #111;
+            padding: 15px;
+            border: 1px solid #222;
+            font-size: 0.85rem;
+            border-radius: 4px;
+        }
+
+        .stat span { color: var(--accent); font-weight: bold; text-shadow: 0 0 5px var(--accent-glow); }
+
+        /* Visualización */
+        #visualization-container {
+            background-color: #000;
+            border: 1px solid #222;
+            display: flex;
+            align-items: flex-end;
+            padding: 20px;
+            gap: 4px;
+            position: relative;
+            background-image: linear-gradient(#111 1px, transparent 1px), linear-gradient(90deg, #111 1px, transparent 1px);
+            background-size: 20px 20px;
+            border-radius: 4px;
+        }
+
+        .bar {
+            background-color: var(--bar-default);
+            flex-grow: 1;
+            position: relative;
+            min-width: 5px;
+            border-top: 2px solid rgba(255,255,255,0.05);
+            transition: background-color 0.1s;
+        }
+
+        /* --- Consola de Log --- */
+        #terminal-log {
+            background-color: #050505;
+            border: 1px solid #222;
+            padding: 15px;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: var(--terminal-text);
+            box-shadow: inset 0 0 15px #000;
+            border-radius: 4px;
+        }
+
+        .log-entry { margin-bottom: 5px; line-height: 1.4; }
+        .log-entry::before { content: "> "; color: var(--text-secondary); }
+
+    </style>
+</head>
+<body>
+
+    <aside id="sidebar">
+        <h1>Data Tracer v2</h1>
+
+        <div class="control-group">
+            <label>Algoritmo de Rastreo</label>
+            <select id="algo-select">
+                <option value="lineal">Linear Scan [O(n)]</option>
+                <option value="binaria">Binary Search [O(log n)]</option>
+                <option value="exponencial">Exponential Leap</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Valor Objetivo</label>
+            <input type="number" id="search-target" value="50">
+        </div>
+
+        <div class="control-group">
+            <label>Registros: <span id="size-val">50</span></label>
+            <input type="range" id="array-size" min="10" max="150" value="50">
+        </div>
+
+        <div class="control-group">
+            <label>Latencia Ciclo: <span id="speed-val">100</span>ms</label>
+            <input type="range" id="speed" min="10" max="1000" step="10" value="100">
+        </div>
+
+        <button id="gen-array">Refrescar Sector</button>
+        <button id="sort-array">Indexar Registros</button>
+        <button id="run-btn" style="margin-top: 20px; border-width: 2px;">Iniciar Rastreo</button>
+        <button id="reset-btn" style="border-color: #444; color: #444;">Abortar</button>
+    </aside>
+
+    <main id="main-content">
+        <div id="stats-bar">
+            <div class="stat">CICLOS CMP: <span id="comparisons-count">0</span></div>
+            <div class="stat">DIRECCIÓN: <span id="index-found">STANDBY</span></div>
+            <div class="stat">ESTADO: <span id="status-text">ONLINE</span></div>
+        </div>
+
+        <div id="visualization-container"></div>
+
+        <div id="terminal-log">
+            <div class="log-entry">Núcleo de rastreo online. Esperando directivas...</div>
+        </div>
+    </main>
+
+    <script>
+        let originalArray = [];
+        let isSorted = false;
+        let isRunning = false;
+        let searchTimeout;
+
+        const container = document.getElementById('visualization-container');
+        const log = document.getElementById('terminal-log');
+        const sizeInput = document.getElementById('array-size');
+        const speedInput = document.getElementById('speed');
+        const runBtn = document.getElementById('run-btn');
+
+        function addLog(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerText = msg;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        const sleep = (ms) => new Promise(resolve => searchTimeout = setTimeout(resolve, ms));
+
+        function generateRandomArray(size) {
+            originalArray = Array.from({length: size}, () => Math.floor(Math.random() * 90) + 10);
+            isSorted = false;
+            document.getElementById('status-text').innerText = "DATA NO INDEXADA";
+            renderArray();
+            addLog(`Sector refrescado. ${size} registros cargados.`);
+        }
+
+        function renderArray(highlightIdx = -1, range = null) {
+            container.innerHTML = '';
+            originalArray.forEach((val, i) => {
+                const bar = document.createElement('div');
+                bar.classList.add('bar');
+                bar.style.height = `${val}%`;
+                
+                if (highlightIdx === i) bar.style.backgroundColor = 'var(--bar-comparing)';
+                else if (range && (i < range.low || i > range.high)) bar.style.backgroundColor = 'var(--bar-inactive)';
+                else if (range && (i >= range.low && i <= range.high)) bar.style.backgroundColor = 'var(--bar-range)';
+                
+                container.appendChild(bar);
+            });
+        }
+
+        async function runSearch() {
+            if (isRunning) return;
+            const algo = document.getElementById('algo-select').value;
+            const target = parseInt(document.getElementById('search-target').value);
+            const speed = parseInt(speedInput.value);
+
+            if ((algo === 'binaria' || algo === 'exponencial') && !isSorted) {
+                addLog("CRITICAL ERROR: Protocolo requiere indexación previa.");
+                return;
+            }
+
+            isRunning = true;
+            runBtn.disabled = true;
+            document.getElementById('status-text').innerText = "RASTREANDO SECTOR";
+            document.getElementById('comparisons-count').innerText = "0";
+            let comparisons = 0;
+            let found = -1;
+
+            addLog(`Iniciando rastreo vía ${algo} para valor ${target}...`);
+
+            if (algo === 'lineal') {
+                for (let i = 0; i < originalArray.length; i++) {
+                    comparisons++;
+                    document.getElementById('comparisons-count').innerText = comparisons;
+                    renderArray(i);
+                    addLog(`Escaneando registro 0x${i.toString(16).toUpperCase()}...`);
+                    await sleep(speed);
+                    if (originalArray[i] === target) { found = i; break; }
+                }
+            } 
+            else if (algo === 'binaria') {
+                found = await binarySearch(0, originalArray.length - 1, target, speed);
+            }
+            else if (algo === 'exponencial') {
+                addLog("Iniciando fase Leap (Exponencial)...");
+                if (originalArray[0] === target) {
+                    found = 0;
+                } else {
+                    let i = 1;
+                    comparisons++;
+                    while (i < originalArray.length && originalArray[i] <= target) {
+                        renderArray(i);
+                        addLog(`Salto Leap a bloque ${i}...`);
+                        await sleep(speed);
+                        if (originalArray[i] === target) { found = i; break; }
+                        i = i * 2;
+                        comparisons++;
+                        document.getElementById('comparisons-count').innerText = comparisons;
+                    }
+                    if (found === -1) {
+                        let low = i / 2;
+                        let high = Math.min(i, originalArray.length - 1);
+                        addLog(`Fase Leap finalizada. Rango: [${low}-${high}]. Refinando vía Binaria...`);
+                        found = await binarySearch(low, high, target, speed, comparisons);
+                    }
+                }
+            }
+
+            if (found !== -1) {
+                renderArray();
+                container.children[found].style.backgroundColor = 'var(--bar-found)';
+                container.children[found].style.boxShadow = `0 0 15px ${var(--bar-found)}`;
+                document.getElementById('index-found').innerText = `ADDR_0x${found.toString(16).toUpperCase()}`;
+                addLog(`CONFIRMADO: Objetivo localizado en registro ${found}.`, true);
+            } else {
+                addLog("Rastreo finalizado. Sin coincidencias en el sector.");
+                document.getElementById('index-found').innerText = "NOT_FOUND";
+            }
+
+            isRunning = false;
+            runBtn.disabled = false;
+            document.getElementById('status-text').innerText = "ONLINE";
+        }
+
+        async function binarySearch(low, high, target, speed, initialComps = 0) {
+            let comps = initialComps;
+            while (low <= high) {
+                let mid = Math.floor((low + high) / 2);
+                comps++;
+                document.getElementById('comparisons-count').innerText = comps;
+                renderArray(mid, {low, high});
+                addLog(`Refinando: Pivote en bloque ${mid}`);
+                await sleep(speed);
+
+                if (originalArray[mid] === target) return mid;
+                if (originalArray[mid] < target) low = mid + 1;
+                else high = mid - 1;
+            }
+            return -1;
+        }
+
+        // --- Listeners ---
+        sizeInput.addEventListener('input', (e) => {
+            document.getElementById('size-val').innerText = e.target.value;
+            generateRandomArray(parseInt(e.target.value));
+        });
+
+        speedInput.addEventListener('input', (e) => {
+            document.getElementById('speed-val').innerText = e.target.value;
+        });
+
+        document.getElementById('gen-array').addEventListener('click', () => generateRandomArray(parseInt(sizeInput.value)));
+        
+        document.getElementById('sort-array').addEventListener('click', () => {
+            originalArray.sort((a, b) => a - b);
+            isSorted = true;
+            document.getElementById('status-text').innerText = "DATA INDEXADA";
+            renderArray();
+            addLog("Registros indexados secuencialmente.");
+        });
+
+        runBtn.addEventListener('click', runSearch);
+        
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            clearTimeout(searchTimeout);
+            isRunning = false;
+            runBtn.disabled = false;
+            generateRandomArray(parseInt(sizeInput.value));
+            document.getElementById('index-found').innerText = "STANDBY";
+            document.getElementById('comparisons-count').innerText = "0";
+            addLog("Rastreo abortado por el operador.");
+        });
+
+        generateRandomArray(50);
+    </script>
+</body>
+</html>
